@@ -1,6 +1,6 @@
 import { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 
@@ -22,7 +22,7 @@ const Register = () => {
     const handleRegister = async (e) => {
         e.preventDefault();
         try {
-            const res = await axios.post('http://localhost:5000/api/auth/register', formData);
+            const res = await api.post('/api/auth/register', formData);
             login(res.data);
             navigate(res.data.role === 'RESCUER' ? '/rescuer/dashboard' : '/dashboard');
         } catch (err) {

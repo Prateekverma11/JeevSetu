@@ -67,30 +67,51 @@ const updateAvailability = async (req, res, next) => {
     }
 };
 
-// @desc    Get nearby rescue requests (pending)
+// @desc    Get nearby rescue requests and active assigned rescues
 // @route   GET /api/rescuers/nearby
 // @access  Private (Rescuer)
 const getNearbyRequests = async (req, res, next) => {
     try {
         const user = await User.findById(req.user._id);
 
-        if (!user.location || !user.location.coordinates) {
-            return res.json([]); // No location set yet
+        // Fetch assigned active rescues first
+        const assignedReports = await RescueReport.find({
+            assignedRescuerId: req.user._id,
+            status: { $in: ['ACCEPTED', 'IN_PROGRESS'] }
+        }).sort('-updatedAt');
+
+        let nearbyReports = [];
+
+        if (user.location && user.location.coordinates && user.location.coordinates.length >= 2) {
+            const radius = user.rescueRadius || 5;
+            try {
+                nearbyReports = await RescueReport.find({
+                    status: { $in: ['PENDING', 'NOTIFIED'] },
+                    location: {
+                        $near: {
+                            $geometry: user.location,
+                            $maxDistance: radius * 1000
+                        }
+                    }
+                });
+            } catch (geoErr) {
+                console.warn('Geospatial index query error, falling back to basic pending fetch:', geoErr.message);
+                nearbyReports = await RescueReport.find({
+                    status: { $in: ['PENDING', 'NOTIFIED'] }
+                });
+            }
+        } else {
+            // Fallback if location not set yet: return all pending reports
+            nearbyReports = await RescueReport.find({
+                status: { $in: ['PENDING', 'NOTIFIED'] }
+            });
         }
 
-        const radius = user.rescueRadius || 5;
+        // Combine assigned reports and nearby reports (ensuring uniqueness)
+        const assignedIds = new Set(assignedReports.map(r => r._id.toString()));
+        const filteredNearby = nearbyReports.filter(r => !assignedIds.has(r._id.toString()));
 
-        const reports = await RescueReport.find({
-            status: { $in: ['PENDING', 'NOTIFIED'] },
-            location: {
-                $near: {
-                    $geometry: user.location,
-                    $maxDistance: radius * 1000
-                }
-            }
-        });
-
-        res.json(reports);
+        res.json([...assignedReports, ...filteredNearby]);
     } catch (error) {
         next(error);
     }

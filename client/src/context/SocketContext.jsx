@@ -1,32 +1,46 @@
 import { createContext, useState, useEffect, useContext } from 'react';
 import io from 'socket.io-client';
 import { AuthContext } from './AuthContext';
+import { API_BASE_URL } from '../api/axios';
 
 export const SocketContext = createContext();
 
 export const SocketProvider = ({ children }) => {
     const { user } = useContext(AuthContext);
     const [socket, setSocket] = useState(null);
+    const [isConnected, setIsConnected] = useState(false);
 
     useEffect(() => {
         if (user) {
-            const newSocket = io('http://localhost:5000', {
-                withCredentials: true
+            const newSocket = io(API_BASE_URL, {
+                withCredentials: true,
+                transports: ['websocket', 'polling']
             });
             
-            setSocket(newSocket);
-            
-            // Join personal room based on user ID for targeted notifications
-            newSocket.emit('join', user._id);
+            newSocket.on('connect', () => {
+                setIsConnected(true);
+                newSocket.emit('join', user._id);
+            });
 
-            return () => newSocket.close();
+            newSocket.on('disconnect', () => {
+                setIsConnected(false);
+            });
+
+            setSocket(newSocket);
+
+            return () => {
+                newSocket.close();
+                setSocket(null);
+                setIsConnected(false);
+            };
         } else {
             setSocket(null);
+            setIsConnected(false);
         }
     }, [user]);
 
     return (
-        <SocketContext.Provider value={{ socket }}>
+        <SocketContext.Provider value={{ socket, isConnected }}>
             {children}
         </SocketContext.Provider>
     );

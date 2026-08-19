@@ -51,39 +51,40 @@ const createReport = async (req, res, next) => {
         let notifiedCount = 0;
 
         for (const rescuer of rescuers) {
-            if (!rescuer.location || !rescuer.location.coordinates || !rescuer.rescueRadius) continue;
+            if (!rescuer.location || !rescuer.location.coordinates || rescuer.location.coordinates.length < 2 || !rescuer.rescueRadius) continue;
             
-            // Calculate distance in meters using geospatial query logic or rough calculation
-            // Let's use MongoDB aggregate for exact filtering if needed, but since we have them, we can filter using $geoNear or simply doing another query:
-            
-            const isNear = await User.findOne({
-                _id: rescuer._id,
-                location: {
-                    $near: {
-                        $geometry: {
-                            type: "Point",
-                            coordinates: [Number(longitude), Number(latitude)]
-                        },
-                        $maxDistance: rescuer.rescueRadius * 1000 // Convert km to meters
-                    }
-                }
-            });
+            const [resLng, resLat] = rescuer.location.coordinates;
+            const reportLng = Number(longitude);
+            const reportLat = Number(latitude);
 
-            if (isNear) {
+            const toRad = (val) => (val * Math.PI) / 180;
+            const R = 6371; // Earth radius in km
+            const dLat = toRad(reportLat - resLat);
+            const dLon = toRad(reportLng - resLng);
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(toRad(resLat)) * Math.cos(toRad(reportLat)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distance = R * c;
+
+            if (distance <= rescuer.rescueRadius) {
                 // Create notification
                 const notification = await Notification.create({
                     userId: rescuer._id,
                     reportId: report._id,
                     title: 'New Rescue Request',
-                    message: `An injured ${animalType} has been reported near your location.`,
+                    message: `An injured ${animalType} has been reported within ${distance.toFixed(1)} km of your location.`,
                     type: 'NEW_REPORT'
                 });
 
                 // Notify real-time
-                io.to(rescuer._id.toString()).emit('new_rescue_request', {
-                    report,
-                    notification
-                });
+                if (io) {
+                    io.to(rescuer._id.toString()).emit('new_rescue_request', {
+                        report,
+                        notification
+                    });
+                }
                 
                 notifiedCount++;
             }

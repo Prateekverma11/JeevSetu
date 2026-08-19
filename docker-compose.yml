@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./server:/app/server
+      - ./.env:/app/.env
+      - /app/server/node_modules
+    environment:
+      - NODE_ENV=development
+      # Override MONGO_URI to use the dockerized MongoDB container by default if desired,
+      # or you can leave it to the .env file.
+      - MONGO_URI=mongodb://mongodb:27017/animal-rescuer
+    depends_on:
+      - mongodb
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client:/app/client
+      - /app/client/node_modules
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - server
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+volumes:
+  mongodb_data:

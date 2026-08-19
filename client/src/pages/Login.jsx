@@ -1,7 +1,6 @@
 import { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
-import { GoogleLogin } from '@react-oauth/google';
+import api from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 
@@ -15,7 +14,7 @@ const Login = () => {
     const handleEmailLogin = async (e) => {
         e.preventDefault();
         try {
-            const res = await axios.post('http://localhost:5000/api/auth/login', { email, password });
+            const res = await api.post('/api/auth/login', { email, password });
             login(res.data);
             navigate(res.data.role === 'RESCUER' ? '/rescuer/dashboard' : '/dashboard');
         } catch (err) {
@@ -25,12 +24,11 @@ const Login = () => {
 
     const handleGoogleSuccess = async (credentialResponse) => {
         try {
-            const res = await axios.post('http://localhost:5000/api/auth/google', {
+            const res = await api.post('/api/auth/google', {
                 token: credentialResponse.credential
             });
             login(res.data);
             if (res.data.isNewUser) {
-                // Should redirect to a profile completion page to choose role, but default is CITIZEN
                 navigate('/dashboard');
             } else {
                 navigate(res.data.role === 'RESCUER' ? '/rescuer/dashboard' : '/dashboard');
