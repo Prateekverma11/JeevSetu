@@ -38,7 +38,7 @@ const CitizenDashboard = () => {
     const fetchReports = async () => {
         try {
             const res = await api.get('/api/reports');
-            setReports(res.data);
+            setReports(res.data.data || []);
         } catch (error) {
             console.error('Failed to fetch reports', error);
         } finally {

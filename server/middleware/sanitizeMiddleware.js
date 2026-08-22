@@ -5,14 +5,30 @@ const xss = require('xss');
  * Middleware: MongoDB Injection Protection
  * Strips keys containing '$' or '.' from req.body, req.query, req.params
  * to prevent NoSQL injection attacks.
+ * Compatible with Express 5 (req.query is read-only).
  */
-const mongoSanitizeMiddleware = mongoSanitize({
-    replaceWith: '_',
-    allowDots: false,
-    onSanitize: ({ req, key }) => {
-        console.warn(`[SECURITY] Sanitized suspicious key "${key}" from ${req.method} ${req.originalUrl}`);
-    }
-});
+const mongoSanitizeMiddleware = (req, res, next) => {
+    const options = {
+        replaceWith: '_',
+        allowDots: false
+    };
+
+    ['body', 'params', 'headers', 'query'].forEach((key) => {
+        if (req[key]) {
+            if (mongoSanitize.has(req[key], false)) {
+                console.warn(`[SECURITY] Sanitized suspicious key from ${req.method} ${req.originalUrl}`);
+            }
+            if (key === 'query') {
+                // Mutates req.query in place without reassigning
+                mongoSanitize.sanitize(req[key], options);
+            } else {
+                req[key] = mongoSanitize.sanitize(req[key], options);
+            }
+        }
+    });
+    next();
+};
+
 
 /**
  * Sanitize a single string value against XSS payloads.

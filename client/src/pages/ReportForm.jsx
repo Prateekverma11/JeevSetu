@@ -61,7 +61,12 @@ const ReportForm = () => {
             });
             navigate('/dashboard');
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to submit report');
+            const data = err.response?.data;
+            if (data?.errors && data.errors.length > 0) {
+                setError(data.errors.map(e => e.message).join(' | '));
+            } else {
+                setError(data?.message || 'Failed to submit report');
+            }
             setLoading(false);
         }
     };
