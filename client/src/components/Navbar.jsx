@@ -1,9 +1,12 @@
 import { useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { SocketContext } from '../context/SocketContext';
+import NotificationCenter from './NotificationCenter';
 
 const Navbar = () => {
     const { user, logout } = useContext(AuthContext);
+    const { isConnected } = useContext(SocketContext);
     const navigate = useNavigate();
 
     const handleLogout = () => {
@@ -13,15 +16,38 @@ const Navbar = () => {
 
     return (
         <nav className="navbar">
-            <Link to="/" className="navbar-brand">🐾 Animal Rescuer</Link>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <Link to="/" className="navbar-brand">🐾 Animal Rescuer</Link>
+                {user && (
+                    <span 
+                        className="connection-status" 
+                        title={isConnected ? "Real-time socket connected" : "Connecting to socket..."}
+                    >
+                        <span className={`status-dot ${isConnected ? 'online' : 'offline'}`}></span>
+                        {isConnected ? 'Live' : 'Connecting'}
+                    </span>
+                )}
+            </div>
+
             <div className="navbar-nav">
                 {user ? (
                     <>
-                        <span style={{ color: 'var(--text-muted)' }}>Hello, {user.name}</span>
+                        <div className="user-profile-badge">
+                            <span className="user-name">Hello, <strong>{user.name}</strong></span>
+                            <span className="role-pill">{user.role}</span>
+                        </div>
+
+                        <NotificationCenter />
+
                         {user.role === 'CITIZEN' && (
-                            <Link to="/report" className="btn btn-primary">Report Animal</Link>
+                            <Link to="/report" className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>
+                                + Report Animal
+                            </Link>
                         )}
-                        <button onClick={handleLogout} className="btn btn-danger">Logout</button>
+                        
+                        <button onClick={handleLogout} className="btn btn-danger" style={{ padding: '0.5rem 1rem' }}>
+                            Logout
+                        </button>
                     </>
                 ) : (
                     <>

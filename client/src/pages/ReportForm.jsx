@@ -1,30 +1,9 @@
 import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
-
-// Fix for default marker icon in react-leaflet
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
-});
-
-const LocationMarker = ({ setPosition, position }) => {
-    useMapEvents({
-        click(e) {
-            setPosition(e.latlng);
-        },
-    });
-
-    return position === null ? null : (
-        <Marker position={position}></Marker>
-    );
-};
+import ReportMap from '../components/ReportMap';
 
 const ReportForm = () => {
     const { user } = useContext(AuthContext);
@@ -36,7 +15,9 @@ const ReportForm = () => {
         severity: 'MEDIUM'
     });
     const [image, setImage] = useState(null);
+    const [imagePreview, setImagePreview] = useState(null);
     const [position, setPosition] = useState(null); // {lat, lng}
+    const [mapCenter, setMapCenter] = useState([20.5937, 78.9629]);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -44,11 +25,19 @@ const ReportForm = () => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setImage(file);
+            setImagePreview(URL.createObjectURL(file));
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         
         if (!position) {
-            setError('Please select a location on the map');
+            setError('Please click on the map to set the location.');
             return;
         }
 
@@ -64,10 +53,10 @@ const ReportForm = () => {
 
         try {
             setLoading(true);
-            await axios.post('http://localhost:5000/api/reports', data, {
+            setError('');
+            await api.post('/api/reports', data, {
                 headers: {
-                    'Content-Type': 'multipart/form-data',
-                    Authorization: `Bearer ${user.token}`
+                    'Content-Type': 'multipart/form-data'
                 }
             });
             navigate('/dashboard');
@@ -81,13 +70,15 @@ const ReportForm = () => {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
-                    setPosition({
+                    const coords = {
                         lat: pos.coords.latitude,
                         lng: pos.coords.longitude
-                    });
+                    };
+                    setPosition(coords);
+                    setMapCenter([coords.lat, coords.lng]);
                 },
                 (err) => {
-                    setError('Unable to retrieve your location');
+                    setError('Unable to retrieve location. Please check browser permissions.');
                 }
             );
         } else {
@@ -99,37 +90,60 @@ const ReportForm = () => {
         <>
             <Navbar />
             <div className="container animate-fade-in">
-                <div className="glass-panel" style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
-                    <h2>Report an Injured Animal</h2>
-                    <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Please provide accurate details to help rescuers act quickly.</p>
+                <div className="glass-panel" style={{ padding: '2.5rem', maxWidth: '800px', margin: '0 auto' }}>
+                    <h2>🚨 Report an Injured Animal</h2>
+                    <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
+                        Provide details and drop a pin on the map to alert rescuers near you immediately.
+                    </p>
                     
-                    {error && <div style={{ color: 'var(--danger)', marginBottom: '1rem' }}>{error}</div>}
+                    {error && (
+                        <div style={{ padding: '0.75rem 1rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '8px', color: '#FCA5A5', marginBottom: '1.5rem' }}>
+                            ⚠️ {error}
+                        </div>
+                    )}
                     
                     <form onSubmit={handleSubmit}>
-                        <div className="form-group">
-                            <label>Animal Type</label>
-                            <select 
-                                name="animalType" 
-                                className="form-control" 
-                                value={formData.animalType} 
-                                onChange={handleChange}
-                            >
-                                <option value="Dog">Dog</option>
-                                <option value="Cat">Cat</option>
-                                <option value="Bird">Bird</option>
-                                <option value="Cow">Cow</option>
-                                <option value="Horse">Horse</option>
-                                <option value="Other">Other</option>
-                            </select>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                            <div className="form-group">
+                                <label>Animal Type</label>
+                                <select 
+                                    name="animalType" 
+                                    className="form-control" 
+                                    value={formData.animalType} 
+                                    onChange={handleChange}
+                                >
+                                    <option value="Dog">🐶 Dog</option>
+                                    <option value="Cat">🐱 Cat</option>
+                                    <option value="Bird">🐦 Bird</option>
+                                    <option value="Cow">🐄 Cow</option>
+                                    <option value="Horse">🐴 Horse</option>
+                                    <option value="Other">🐾 Other</option>
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label>Severity Level</label>
+                                <select 
+                                    name="severity" 
+                                    className="form-control" 
+                                    value={formData.severity} 
+                                    onChange={handleChange}
+                                >
+                                    <option value="LOW">🟢 Low (Minor injury/stray)</option>
+                                    <option value="MEDIUM">🟡 Medium (Needs care soon)</option>
+                                    <option value="HIGH">🟠 High (Bleeding/Severe)</option>
+                                    <option value="CRITICAL">🔴 Critical (Immediate Action)</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div className="form-group">
-                            <label>Description</label>
+                            <label>Description & Observed Injuries</label>
                             <textarea 
                                 name="description" 
                                 className="form-control" 
                                 rows="3"
-                                placeholder="Describe the animal and its condition"
+                                placeholder="Describe the animal, visible injuries, behavior, or nearby landmarks..."
                                 value={formData.description} 
                                 onChange={handleChange}
                                 required
@@ -137,56 +151,61 @@ const ReportForm = () => {
                         </div>
 
                         <div className="form-group">
-                            <label>Severity</label>
-                            <select 
-                                name="severity" 
-                                className="form-control" 
-                                value={formData.severity} 
-                                onChange={handleChange}
-                            >
-                                <option value="LOW">Low (Minor injury/stray)</option>
-                                <option value="MEDIUM">Medium (Needs medical attention soon)</option>
-                                <option value="HIGH">High (Severe injury, bleeding)</option>
-                                <option value="CRITICAL">Critical (Life-threatening, immediate action required)</option>
-                            </select>
-                        </div>
-
-                        <div className="form-group">
-                            <label>Animal Photo</label>
+                            <label>Animal Photograph (Optional but Recommended)</label>
                             <input 
                                 type="file" 
                                 className="form-control" 
                                 accept="image/png, image/jpeg, image/webp"
-                                onChange={(e) => setImage(e.target.files[0])}
+                                onChange={handleImageChange}
                             />
+                            {imagePreview && (
+                                <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+                                    <img 
+                                        src={imagePreview} 
+                                        alt="Preview" 
+                                        style={{ maxHeight: '200px', borderRadius: '8px', border: '1px solid var(--glass-border)' }} 
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         <div className="form-group">
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <label>Location</label>
-                                <button type="button" onClick={handleGetCurrentLocation} className="btn btn-secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
-                                    Use My Location
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                <label style={{ margin: 0 }}>Pin Incident Location</label>
+                                <button 
+                                    type="button" 
+                                    onClick={handleGetCurrentLocation} 
+                                    className="btn btn-secondary" 
+                                    style={{ padding: '0.35rem 0.85rem', fontSize: '0.85rem' }}
+                                >
+                                    📍 Use My GPS Location
                                 </button>
                             </div>
-                            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Click on the map to set the exact location.</p>
-                            <div className="map-container">
-                                <MapContainer center={[51.505, -0.09]} zoom={13} style={{ height: '100%', width: '100%' }}>
-                                    <TileLayer
-                                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                                    />
-                                    <LocationMarker position={position} setPosition={setPosition} />
-                                </MapContainer>
-                            </div>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                                Click anywhere on the map to set the precise location pin.
+                            </p>
+                            
+                            <ReportMap 
+                                center={mapCenter} 
+                                zoom={14} 
+                                onMapClick={(latlng) => setPosition(latlng)} 
+                                selectedPosition={position}
+                            />
+
                             {position && (
-                                <p style={{ fontSize: '0.875rem', color: 'var(--secondary)', marginTop: '0.5rem' }}>
-                                    Selected Location: {position.lat.toFixed(5)}, {position.lng.toFixed(5)}
+                                <p style={{ fontSize: '0.9rem', color: 'var(--secondary)', marginTop: '0.75rem', fontWeight: '600' }}>
+                                    ✅ Selected Coords: {position.lat.toFixed(5)}, {position.lng.toFixed(5)}
                                 </p>
                             )}
                         </div>
 
-                        <button type="submit" className="btn btn-primary" disabled={loading}>
-                            {loading ? 'Submitting...' : 'Submit Report'}
+                        <button 
+                            type="submit" 
+                            className="btn btn-primary btn-block" 
+                            style={{ padding: '0.85rem', fontSize: '1rem', marginTop: '1.5rem' }}
+                            disabled={loading}
+                        >
+                            {loading ? 'Submitting Incident Report...' : '🚨 Broadcast Emergency Rescue Report'}
                         </button>
                     </form>
                 </div>
