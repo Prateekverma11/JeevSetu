@@ -1,0 +1,195 @@
+// =============================================================================
+// Prisma Schema — ORM Mapping for Animal Rescue Platform
+// =============================================================================
+//
+// This file demonstrates ORM (Object-Relational Mapping) usage with Prisma.
+// While this project uses MongoDB + Mongoose (an ODM), this schema shows
+// how the same data models would be expressed using Prisma ORM for a
+// relational PostgreSQL database.
+//
+// ORM Concepts Demonstrated:
+// - Model definitions with typed fields (equivalent to Mongoose Schema)
+// - Relations: one-to-many (User -> RescueReport, User -> Notification)
+// - Enums for constrained string fields
+// - Timestamps (createdAt, updatedAt) via @@map and @default
+// - Unique constraints and index declarations
+// - Soft references vs required relations
+// - The @relation directive for foreign keys (normalization in action)
+//
+// Normalization Principles Applied (1NF, 2NF, 3NF):
+// - 1NF: Each column holds atomic values (no arrays of primitives in core tables)
+// - 2NF: Non-key attributes fully depend on the primary key (no partial dependencies)
+// - 3NF: No transitive dependencies (e.g., address stored separately, not duplicated)
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUM DEFINITIONS
+// =============================================================================
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
+enum UserRole {
+  CITIZEN
+  RESCUER
+  ADMIN
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ReportStatus {
+  PENDING
+  NOTIFIED
+  ACCEPTED
+  DECLINED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum NotificationType {
+  NEW_REPORT
+  RESCUE_ACCEPTED
+  RESCUE_IN_PROGRESS
+  RESCUE_COMPLETED
+  RESCUE_CANCELLED
+}
+
+// =============================================================================
+// USER MODEL
+// Represents both citizens and rescuers (role-based differentiation).
+// Address is normalized into a separate embedded object (UserAddress).
+// =============================================================================
+
+model User {
+  id           String       @id @default(cuid())
+  name         String
+  email        String       @unique
+  password     String?      // nullable for OAuth users
+  googleId     String?      @unique
+  authProvider AuthProvider @default(LOCAL)
+  phone        String?
+  role         UserRole     @default(CITIZEN)
+  profileImage String?
+
+  // Rescuer-specific fields (null for citizens)
+  latitude     Float?
+  longitude    Float?
+  rescueRadius Float?       // in km
+  isAvailable  Boolean      @default(false)
+
+  // Timestamps (auto-managed by Prisma)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  reportsFiled      RescueReport[]  @relation("CitizenReports")
+  assignedRescues   RescueReport[]  @relation("AssignedRescuer")
+  notifications     Notification[]
+  rescueHistories   RescueHistory[]
+
+  @@map("users")
+}
+
+// =============================================================================
+// RESCUE REPORT MODEL
+// Normalized: citizenId and assignedRescuerId are foreign keys (not embedded docs)
+// =============================================================================
+
+model RescueReport {
+  id               String       @id @default(cuid())
+  animalType       String
+  description      String
+  severity         Severity
+  imageUrl         String?
+  latitude         Float
+  longitude        Float
+  status           ReportStatus @default(PENDING)
+  acceptedAt       DateTime?
+  completedAt      DateTime?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign Keys (Normalization: references, not embedded data)
+  citizenId        String
+  citizen          User     @relation("CitizenReports", fields: [citizenId], references: [id])
+
+  assignedRescuerId String?
+  assignedRescuer   User?    @relation("AssignedRescuer", fields: [assignedRescuerId], references: [id])
+
+  // Relations
+  notifications  Notification[]
+  history        RescueHistory[]
+
+  // Indexes for geospatial queries (lat/lng range queries)
+  @@index([latitude, longitude])
+  @@index([status])
+  @@index([citizenId])
+  @@map("rescue_reports")
+}
+
+// =============================================================================
+// RESCUE HISTORY MODEL
+// Normalized audit log — each status transition is its own row.
+// Demonstrates 3NF: no transitive dependencies; all fields depend only on id.
+// =============================================================================
+
+model RescueHistory {
+  id          String       @id @default(cuid())
+  status      String       // status at the time of the change
+  notes       String?
+  createdAt   DateTime     @default(now())
+
+  // Foreign Keys
+  reportId    String
+  report      RescueReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  changedById String
+  changedBy   User         @relation(fields: [changedById], references: [id])
+
+  @@index([reportId])
+  @@map("rescue_history")
+}
+
+// =============================================================================
+// NOTIFICATION MODEL
+// Normalized: references User and RescueReport by foreign key.
+// =============================================================================
+
+model Notification {
+  id        String           @id @default(cuid())
+  title     String
+  message   String
+  type      NotificationType
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  // Foreign Keys
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  reportId  String
+  report    RescueReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([reportId])
+  @@map("notifications")
+}

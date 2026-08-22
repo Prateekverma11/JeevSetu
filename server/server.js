@@ -3,10 +3,16 @@ require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 const http = require('http');
 const app = require('./app');
 const connectDB = require('./config/db');
+const { getRedisClient } = require('./config/redis');
+const { startAllJobs } = require('./jobs/cleanupJob');
 const { Server } = require('socket.io');
 
 // Connect to Database
 connectDB();
+
+// Initialize Redis client (graceful — won't crash if Redis is unavailable)
+// CONCEPT: Caching with Redis
+getRedisClient();
 
 const server = http.createServer(app);
 
@@ -43,4 +49,20 @@ const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    console.log(`SSR pages available at: http://localhost:${PORT}/ssr`);
+
+    // CONCEPT: Scheduled Jobs / Cron
+    // Start all cron jobs after server is listening
+    startAllJobs();
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received. Shutting down gracefully...');
+    const { stopAllJobs } = require('./jobs/cleanupJob');
+    stopAllJobs();
+    server.close(() => {
+        console.log('Server closed.');
+        process.exit(0);
+    });
 });

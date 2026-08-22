@@ -2,9 +2,14 @@ const express = require('express');
 const router = express.Router();
 const { registerUser, loginUser, getMe, googleAuth } = require('../controllers/authController');
 const { authenticateUser } = require('../middleware/authMiddleware');
+const {
+    validateRegister,
+    validateLogin
+} = require('../middleware/validateMiddleware');
 
-router.post('/register', registerUser);
-router.post('/login', loginUser);
+// CONCEPT: Request Body Validation — validate all auth inputs before processing
+router.post('/register', validateRegister, registerUser);
+router.post('/login', validateLogin, loginUser);
 router.post('/google', googleAuth);
 router.get('/me', authenticateUser, getMe);
 
