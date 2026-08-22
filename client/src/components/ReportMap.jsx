@@ -1,39 +1,14 @@
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
-import { useEffect } from 'react';
-import L from 'leaflet';
+import { useEffect, useState, useCallback } from 'react';
+import { GoogleMap, useJsApiLoader, Marker, Circle, InfoWindow } from '@react-google-maps/api';
 import { getImageUrl } from '../api/axios';
 
-// Leaflet icon fix
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
-});
-
-// Custom icon for Rescuer location
-const rescuerIcon = new L.Icon({
-    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41]
-});
-
-// Helper component to auto-recenter map when center prop updates
-const RecenterMap = ({ center }) => {
-    const map = useMap();
-    useEffect(() => {
-        if (center && center[0] && center[1]) {
-            map.flyTo(center, map.getZoom(), { animate: true });
-        }
-    }, [center, map]);
-    return null;
+const containerStyle = {
+    width: '100%',
+    height: '100%'
 };
 
 const ReportMap = ({ 
-    center = [20.5937, 78.9629], // Default fallback (India center or standard coords)
+    center = [20.5937, 78.9629], // [lat, lng]
     zoom = 13, 
     reports = [], 
     rescuerLocation = null, 
@@ -41,54 +16,90 @@ const ReportMap = ({
     onMapClick = null,
     selectedPosition = null
 }) => {
-    // Map event handler component for manual click selection
-    const MapEvents = () => {
-        const map = useMap();
-        useEffect(() => {
-            if (!onMapClick) return;
-            const handleClick = (e) => {
-                onMapClick(e.latlng);
-            };
-            map.on('click', handleClick);
-            return () => map.off('click', handleClick);
-        }, [map]);
-        return null;
+    const { isLoaded } = useJsApiLoader({
+        id: 'google-map-script',
+        googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "" // Add your API key here
+    });
+
+    const [map, setMap] = useState(null);
+    const [selectedReport, setSelectedReport] = useState(null);
+
+    const onLoad = useCallback(function callback(map) {
+        setMap(map);
+    }, []);
+
+    const onUnmount = useCallback(function callback(map) {
+        setMap(null);
+    }, []);
+
+    // Effect to pan map when center changes
+    useEffect(() => {
+        if (map && center && center[0] && center[1]) {
+            map.panTo({ lat: center[0], lng: center[1] });
+        }
+    }, [center, map]);
+
+    const handleMapClick = (e) => {
+        if (onMapClick) {
+            onMapClick({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+        }
     };
+
+    if (!isLoaded) return <div>Loading Map...</div>;
+
+    const mapCenter = { lat: center[0], lng: center[1] };
+
+    // Format rescuer location if valid
+    const rescuerPos = rescuerLocation && rescuerLocation.lat && rescuerLocation.lng 
+        ? { lat: rescuerLocation.lat, lng: rescuerLocation.lng } 
+        : null;
+
+    // Format selected position if valid
+    const selectedPos = selectedPosition && selectedPosition.lat && selectedPosition.lng 
+        ? { lat: selectedPosition.lat, lng: selectedPosition.lng } 
+        : null;
 
     return (
         <div className="map-container">
-            <MapContainer center={center} zoom={zoom} style={{ height: '100%', width: '100%' }}>
-                <TileLayer
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                />
-                
-                <RecenterMap center={center} />
-                {onMapClick && <MapEvents />}
-
+            <GoogleMap
+                mapContainerStyle={containerStyle}
+                center={mapCenter}
+                zoom={zoom}
+                onLoad={onLoad}
+                onUnmount={onUnmount}
+                onClick={handleMapClick}
+                options={{
+                    streetViewControl: false,
+                    mapTypeControl: false,
+                }}
+            >
                 {/* Rescuer position marker and radius circle */}
-                {rescuerLocation && rescuerLocation.lat && rescuerLocation.lng && (
+                {rescuerPos && (
                     <>
-                        <Marker position={[rescuerLocation.lat, rescuerLocation.lng]} icon={rescuerIcon}>
-                            <Popup>
-                                <strong>Your Location</strong>
-                                <br />
-                                Rescue Radius: {rescueRadius} km
-                            </Popup>
-                        </Marker>
+                        <Marker 
+                            position={rescuerPos} 
+                            icon={{
+                                url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png'
+                            }}
+                            title="Your Location"
+                        />
                         <Circle
-                            center={[rescuerLocation.lat, rescuerLocation.lng]}
+                            center={rescuerPos}
                             radius={rescueRadius * 1000}
-                            pathOptions={{ color: '#10B981', fillColor: '#10B981', fillOpacity: 0.15 }}
+                            options={{
+                                strokeColor: '#10B981',
+                                strokeOpacity: 0.8,
+                                strokeWeight: 2,
+                                fillColor: '#10B981',
+                                fillOpacity: 0.15,
+                            }}
                         />
                     </>
                 )}
 
                 {/* Click selected marker */}
-                {selectedPosition && selectedPosition.lat && selectedPosition.lng && (
-                    <Marker position={[selectedPosition.lat, selectedPosition.lng]}>
-                        <Popup>Selected Location</Popup>
-                    </Marker>
+                {selectedPos && (
+                    <Marker position={selectedPos} />
                 )}
 
                 {/* List of animal reports markers */}
@@ -97,31 +108,42 @@ const ReportMap = ({
                         return null;
                     }
                     const [lng, lat] = report.location.coordinates;
-                    const imgUrl = getImageUrl(report.imageUrl);
+                    const pos = { lat, lng };
+                    
+                    const isSelected = selectedReport && selectedReport._id === report._id;
 
                     return (
-                        <Marker key={report._id} position={[lat, lng]}>
-                            <Popup>
-                                <div style={{ maxWidth: '200px' }}>
-                                    {imgUrl && (
-                                        <img 
-                                            src={imgUrl} 
-                                            alt={report.animalType} 
-                                            style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '4px', marginBottom: '0.5rem' }} 
-                                        />
-                                    )}
-                                    <strong style={{ fontSize: '1rem', color: '#1E293B' }}>{report.animalType}</strong>
-                                    <br />
-                                    <span style={{ fontSize: '0.8rem', color: '#64748B' }}>Severity: {report.severity}</span>
-                                    <br />
-                                    <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#4F46E5' }}>Status: {report.status}</span>
-                                    <p style={{ fontSize: '0.8rem', margin: '0.25rem 0 0 0', color: '#334155' }}>{report.description}</p>
-                                </div>
-                            </Popup>
+                        <Marker 
+                            key={report._id} 
+                            position={pos}
+                            onClick={() => setSelectedReport(report)}
+                        >
+                            {isSelected && (
+                                <InfoWindow
+                                    position={pos}
+                                    onCloseClick={() => setSelectedReport(null)}
+                                >
+                                    <div style={{ maxWidth: '200px' }}>
+                                        {report.imageUrl && (
+                                            <img 
+                                                src={getImageUrl(report.imageUrl)} 
+                                                alt={report.animalType} 
+                                                style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '4px', marginBottom: '0.5rem' }} 
+                                            />
+                                        )}
+                                        <strong style={{ fontSize: '1rem', color: '#1E293B' }}>{report.animalType}</strong>
+                                        <br />
+                                        <span style={{ fontSize: '0.8rem', color: '#64748B' }}>Severity: {report.severity}</span>
+                                        <br />
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#4F46E5' }}>Status: {report.status}</span>
+                                        <p style={{ fontSize: '0.8rem', margin: '0.25rem 0 0 0', color: '#334155' }}>{report.description}</p>
+                                    </div>
+                                </InfoWindow>
+                            )}
                         </Marker>
                     );
                 })}
-            </MapContainer>
+            </GoogleMap>
         </div>
     );
 };
