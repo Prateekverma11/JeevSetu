@@ -9,6 +9,7 @@ import Register from './pages/Register';
 import CitizenDashboard from './pages/CitizenDashboard';
 import RescuerDashboard from './pages/RescuerDashboard';
 import ReportForm from './pages/ReportForm';
+import JavaScriptConcepts from './pages/JavaScriptConcepts';
 
 import './index.css';
 
@@ -45,6 +46,8 @@ function App() {
             <RescuerDashboard />
           </ProtectedRoute>
         } />
+        
+        <Route path="/concepts" element={<JavaScriptConcepts />} />
         
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

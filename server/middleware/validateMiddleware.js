@@ -77,8 +77,7 @@ const validateCreateReport = [
 
     body('description')
         .trim()
-        .notEmpty().withMessage('Description is required')
-        .isLength({ min: 10, max: 1000 }).withMessage('Description must be 10-1000 characters'),
+        .notEmpty().withMessage('Description is required'),
 
     body('severity')
         .notEmpty().withMessage('Severity is required')

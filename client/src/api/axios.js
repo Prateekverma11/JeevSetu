@@ -5,9 +5,11 @@ export const getBaseUrl = () => {
     if (import.meta.env.VITE_API_URL) {
         return import.meta.env.VITE_API_URL;
     }
-    // If running in development with Vite default server on 5173, point to backend default 5000
-    if (window.location.port === '5173') {
-        return 'http://localhost:5000';
+    // If running in development on localhost or 127.0.0.1, point to backend default 5001
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        if (window.location.port !== '5001') {
+            return 'http://localhost:5001';
+        }
     }
     // Otherwise use current window origin (for unified deployment)
     return window.location.origin;

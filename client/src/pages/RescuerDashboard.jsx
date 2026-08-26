@@ -5,6 +5,7 @@ import { SocketContext } from '../context/SocketContext';
 import Navbar from '../components/Navbar';
 import AIChat from '../components/AIChat';
 import ReportMap from '../components/ReportMap';
+import { getGeolocationPromise, retryPromise } from '../utils';
 
 const RescuerDashboard = () => {
     const { user, login } = useContext(AuthContext);
@@ -44,30 +45,28 @@ const RescuerDashboard = () => {
 
     const fetchNearbyReports = async () => {
         try {
-            const res = await api.get('/api/rescuers/nearby');
+            // Promises vs Callbacks concept: retryPromise wraps the fetch in an async
+            // retry loop (pure Promise pattern) rather than nested error-first callbacks.
+            const res = await retryPromise(() => api.get('/api/rescuers/nearby'), 3, 500);
             setNearbyReports(res.data);
         } catch (error) {
-            console.error('Failed to fetch nearby reports', error);
+            console.error('Failed to fetch nearby reports after retries:', error);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleGetCurrentLocation = () => {
+    const handleGetCurrentLocation = async () => {
         setLocationStatus('Detecting location...');
-        if (!navigator.geolocation) {
-            setLocationStatus('Geolocation is not supported by your browser.');
-            return;
+        try {
+            const coords = await getGeolocationPromise({ enableHighAccuracy: true, timeout: 10000 });
+            const lat = coords.latitude;
+            const lng = coords.longitude;
+            setLocationInput({ lat, lng });
+            setLocationStatus(`📍 Detected: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+        } catch {
+            setLocationStatus('Unable to retrieve location. Please check browser permissions.');
         }
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                const lat = pos.coords.latitude;
-                const lng = pos.coords.longitude;
-                setLocationInput({ lat, lng });
-                setLocationStatus(`📍 Detected: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
-            },
-            () => setLocationStatus('Unable to retrieve location. Please check browser permissions.')
-        );
     };
 
     const handleUpdateLocation = async (e) => {

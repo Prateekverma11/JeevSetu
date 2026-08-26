@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, useRef } from 'react';
 import api, { getImageUrl } from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
 import { SocketContext } from '../context/SocketContext';
@@ -6,13 +6,30 @@ import Navbar from '../components/Navbar';
 import AIChat from '../components/AIChat';
 import ReportMap from '../components/ReportMap';
 import { Link } from 'react-router-dom';
+import { MicrotaskBatcher } from '../utils';
 
 const CitizenDashboard = () => {
-    const { user } = useContext(AuthContext);
+    useContext(AuthContext);
     const { socket } = useContext(SocketContext);
     const [reports, setReports] = useState([]);
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'map'
+
+    // Event Loop concept: MicrotaskBatcher coalesces rapid socket status updates
+    // that arrive within the same JS tick into a single state update, avoiding
+    // redundant re-renders when multiple events fire back-to-back.
+    const batcherRef = useRef(null);
+    if (!batcherRef.current) {
+        batcherRef.current = new MicrotaskBatcher((updatedReports) => {
+            setReports((prev) => {
+                let next = [...prev];
+                for (const updated of updatedReports) {
+                    next = next.map((r) => (r._id === updated._id ? updated : r));
+                }
+                return next;
+            });
+        });
+    }
 
     useEffect(() => {
         fetchReports();
@@ -21,11 +38,8 @@ const CitizenDashboard = () => {
     useEffect(() => {
         if (socket) {
             socket.on('rescue_status_update', (data) => {
-                setReports(prevReports => 
-                    prevReports.map(report => 
-                        report._id === data.report._id ? data.report : report
-                    )
-                );
+                // Queue update into microtask batcher instead of calling setReports directly
+                batcherRef.current.add(data.report);
             });
         }
         return () => {
@@ -38,7 +52,7 @@ const CitizenDashboard = () => {
     const fetchReports = async () => {
         try {
             const res = await api.get('/api/reports');
-            setReports(res.data);
+            setReports(res.data.data || []);
         } catch (error) {
             console.error('Failed to fetch reports', error);
         } finally {

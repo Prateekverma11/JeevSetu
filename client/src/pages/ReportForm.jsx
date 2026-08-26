@@ -4,9 +4,10 @@ import api from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import ReportMap from '../components/ReportMap';
+import { getGeolocationPromise, readFileAsDataURLPromise, evaluateReportWithHoisting } from '../utils';
 
 const ReportForm = () => {
-    const { user } = useContext(AuthContext);
+    useContext(AuthContext);
     const navigate = useNavigate();
     
     const [formData, setFormData] = useState({
@@ -25,11 +26,16 @@ const ReportForm = () => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleImageChange = (e) => {
+    const handleImageChange = async (e) => {
         const file = e.target.files[0];
         if (file) {
             setImage(file);
-            setImagePreview(URL.createObjectURL(file));
+            try {
+                const previewUrl = await readFileAsDataURLPromise(file);
+                setImagePreview(previewUrl);
+            } catch {
+                setImagePreview(URL.createObjectURL(file));
+            }
         }
     };
 
@@ -40,6 +46,17 @@ const ReportForm = () => {
             setError('Please click on the map to set the location.');
             return;
         }
+
+        // Hoisting concept: evaluateReportWithHoisting uses hoisted function declarations
+        // internally (calculateRescuePriority, getUrgencyLabel, formatRescueSummary)
+        // to compute a priority score and urgency label before sending to the server.
+        const evaluated = evaluateReportWithHoisting({
+            animalType: formData.animalType,
+            severity: formData.severity,
+            status: 'PENDING',
+            location: { coordinates: [position.lng, position.lat] },
+        });
+        console.info('[ReportForm] Hoisting evaluation:', evaluated.urgencyLabel, `(score: ${evaluated.priorityScore})`); 
 
         const data = new FormData();
         data.append('animalType', formData.animalType);
@@ -61,28 +78,25 @@ const ReportForm = () => {
             });
             navigate('/dashboard');
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to submit report');
+            const data = err.response?.data;
+            if (data?.errors && data.errors.length > 0) {
+                setError(data.errors.map(e => e.message).join(' | '));
+            } else {
+                setError(data?.message || 'Failed to submit report');
+            }
             setLoading(false);
         }
     };
 
-    const handleGetCurrentLocation = () => {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                    const coords = {
-                        lat: pos.coords.latitude,
-                        lng: pos.coords.longitude
-                    };
-                    setPosition(coords);
-                    setMapCenter([coords.lat, coords.lng]);
-                },
-                (err) => {
-                    setError('Unable to retrieve location. Please check browser permissions.');
-                }
-            );
-        } else {
-            setError('Geolocation is not supported by your browser');
+    const handleGetCurrentLocation = async () => {
+        try {
+            setError('');
+            const coords = await getGeolocationPromise({ enableHighAccuracy: true, timeout: 10000 });
+            const pos = { lat: coords.latitude, lng: coords.longitude };
+            setPosition(pos);
+            setMapCenter([pos.lat, pos.lng]);
+        } catch (err) {
+            setError(err.message || 'Unable to retrieve location. Please check browser permissions.');
         }
     };
 
