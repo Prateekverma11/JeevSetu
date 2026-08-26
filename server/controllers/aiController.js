@@ -88,7 +88,7 @@ const chatWithAI = async (req, res, next) => {
         }
 
         const groq = new Groq({ apiKey: process.env.LLM_API_KEY });
-        
+
         const response = await groq.chat.completions.create({
             model: 'openai/gpt-oss-120b',
             messages: [

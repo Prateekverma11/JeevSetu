@@ -38,6 +38,9 @@ const Navbar = () => {
                         </div>
 
                         <NotificationCenter />
+                        <Link to="/concepts" className="nav-link" style={{ fontWeight: '600' }}>
+                            ⚡ JS Concepts
+                        </Link>
 
                         {user.role === 'CITIZEN' && (
                             <Link to="/report" className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>
@@ -51,6 +54,9 @@ const Navbar = () => {
                     </>
                 ) : (
                     <>
+                        <Link to="/concepts" className="nav-link" style={{ fontWeight: '600' }}>
+                            ⚡ JS Concepts
+                        </Link>
                         <Link to="/login" className="nav-link">Login</Link>
                         <Link to="/register" className="btn btn-primary">Sign Up</Link>
                     </>
