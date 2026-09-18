@@ -30,3 +30,5 @@ server/uploads/*
 .idea/
 .DS_Store
 Thumbs.db
+.vite/
+client/.vite/

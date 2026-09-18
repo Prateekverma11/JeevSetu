@@ -2,9 +2,10 @@ import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
-import Navbar from '../components/Navbar';
+import Sidebar from '../components/Sidebar';
+import TopHeader from '../components/TopHeader';
 import ReportMap from '../components/ReportMap';
-import { getGeolocationPromise, readFileAsDataURLPromise, evaluateReportWithHoisting } from '../utils';
+import AIChat from '../components/AIChat';
 
 const ReportForm = () => {
     useContext(AuthContext);
@@ -26,16 +27,11 @@ const ReportForm = () => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleImageChange = async (e) => {
+    const handleImageChange = (e) => {
         const file = e.target.files[0];
         if (file) {
             setImage(file);
-            try {
-                const previewUrl = await readFileAsDataURLPromise(file);
-                setImagePreview(previewUrl);
-            } catch {
-                setImagePreview(URL.createObjectURL(file));
-            }
+            setImagePreview(URL.createObjectURL(file));
         }
     };
 
@@ -43,20 +39,9 @@ const ReportForm = () => {
         e.preventDefault();
         
         if (!position) {
-            setError('Please click on the map to set the location.');
+            setError('Please click on the map to set the incident location.');
             return;
         }
-
-        // Hoisting concept: evaluateReportWithHoisting uses hoisted function declarations
-        // internally (calculateRescuePriority, getUrgencyLabel, formatRescueSummary)
-        // to compute a priority score and urgency label before sending to the server.
-        const evaluated = evaluateReportWithHoisting({
-            animalType: formData.animalType,
-            severity: formData.severity,
-            status: 'PENDING',
-            location: { coordinates: [position.lng, position.lat] },
-        });
-        console.info('[ReportForm] Hoisting evaluation:', evaluated.urgencyLabel, `(score: ${evaluated.priorityScore})`); 
 
         const data = new FormData();
         data.append('animalType', formData.animalType);
@@ -88,143 +73,179 @@ const ReportForm = () => {
         }
     };
 
-    const handleGetCurrentLocation = async () => {
-        try {
-            setError('');
-            const coords = await getGeolocationPromise({ enableHighAccuracy: true, timeout: 10000 });
-            const pos = { lat: coords.latitude, lng: coords.longitude };
-            setPosition(pos);
-            setMapCenter([pos.lat, pos.lng]);
-        } catch (err) {
-            setError(err.message || 'Unable to retrieve location. Please check browser permissions.');
+    const handleGetCurrentLocation = () => {
+        if (!navigator.geolocation) {
+            setError('Geolocation is not supported by your browser.');
+            return;
         }
+        setError('');
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const newPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                setPosition(newPos);
+                setMapCenter([newPos.lat, newPos.lng]);
+            },
+            () => {
+                setError('Unable to retrieve location. Please check browser permissions.');
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
     };
 
     return (
-        <>
-            <Navbar />
-            <div className="container animate-fade-in">
-                <div className="glass-panel" style={{ padding: '2.5rem', maxWidth: '800px', margin: '0 auto' }}>
-                    <h2>🚨 Report an Injured Animal</h2>
-                    <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-                        Provide details and drop a pin on the map to alert rescuers near you immediately.
-                    </p>
-                    
-                    {error && (
-                        <div style={{ padding: '0.75rem 1rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '8px', color: '#FCA5A5', marginBottom: '1.5rem' }}>
-                            ⚠️ {error}
-                        </div>
-                    )}
-                    
-                    <form onSubmit={handleSubmit}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                            <div className="form-group">
-                                <label>Animal Type</label>
+        <div className="dashboard-layout-container">
+            <Sidebar activeTab="report" />
+
+            <div className="dashboard-main-panel">
+                <TopHeader />
+
+                <main className="dashboard-content-body">
+                    {/* Aligned Header Banner */}
+                    <div className="dashboard-title-banner">
+                        <div className="banner-category">EMERGENCY DISPATCH</div>
+                        <h1 className="banner-main-title">Report an Injured Animal</h1>
+                        <p className="banner-subtitle">
+                            Provide details, upload a photo, and set the map pin to alert nearby verified rescuers immediately.
+                        </p>
+                    </div>
+
+                    <div className="forest-card report-form-card" style={{ maxWidth: '850px', padding: '2rem' }}>
+                        {error && (
+                            <div style={{ color: '#ef4444', marginBottom: '1.25rem', padding: '0.75rem 1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                                {error}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSubmit}>
+                            {/* Animal Type */}
+                            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                                <label className="control-label" style={{ marginBottom: '0.5rem', display: 'block' }}>
+                                    Animal Type <span style={{ color: '#ef4444' }}>*</span>
+                                </label>
                                 <select 
                                     name="animalType" 
-                                    className="form-control" 
                                     value={formData.animalType} 
                                     onChange={handleChange}
+                                    className="form-input-clean"
+                                    required
                                 >
-                                    <option value="Dog">🐶 Dog</option>
-                                    <option value="Cat">🐱 Cat</option>
+                                    <option value="Dog">🐕 Dog</option>
+                                    <option value="Cat">🐈 Cat</option>
                                     <option value="Bird">🐦 Bird</option>
                                     <option value="Cow">🐄 Cow</option>
-                                    <option value="Horse">🐴 Horse</option>
+                                    <option value="Horse">🐎 Horse</option>
                                     <option value="Other">🐾 Other</option>
                                 </select>
                             </div>
 
-                            <div className="form-group">
-                                <label>Severity Level</label>
-                                <select 
-                                    name="severity" 
-                                    className="form-control" 
-                                    value={formData.severity} 
-                                    onChange={handleChange}
-                                >
-                                    <option value="LOW">🟢 Low (Minor injury/stray)</option>
-                                    <option value="MEDIUM">🟡 Medium (Needs care soon)</option>
-                                    <option value="HIGH">🟠 High (Bleeding/Severe)</option>
-                                    <option value="CRITICAL">🔴 Critical (Immediate Action)</option>
-                                </select>
+                            {/* Severity Selector */}
+                            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                                <label className="control-label" style={{ marginBottom: '0.5rem', display: 'block' }}>
+                                    Incident Severity <span style={{ color: '#ef4444' }}>*</span>
+                                </label>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
+                                    {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((sev) => (
+                                        <button
+                                            key={sev}
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, severity: sev })}
+                                            className={`severity-chip severity-chip-${sev.toLowerCase()} ${formData.severity === sev ? 'active' : ''}`}
+                                        >
+                                            {sev}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
 
-                        <div className="form-group">
-                            <label>Description & Observed Injuries</label>
-                            <textarea 
-                                name="description" 
-                                className="form-control" 
-                                rows="3"
-                                placeholder="Describe the animal, visible injuries, behavior, or nearby landmarks..."
-                                value={formData.description} 
-                                onChange={handleChange}
-                                required
-                            ></textarea>
-                        </div>
+                            {/* Description */}
+                            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                                <label className="control-label" style={{ marginBottom: '0.5rem', display: 'block' }}>
+                                    Description of Injury & Landmark <span style={{ color: '#ef4444' }}>*</span>
+                                </label>
+                                <textarea 
+                                    name="description" 
+                                    value={formData.description} 
+                                    onChange={handleChange}
+                                    className="form-input-clean"
+                                    rows="3"
+                                    placeholder="E.g., Limping, injured near the main market bus stop..."
+                                    required
+                                />
+                            </div>
 
-                        <div className="form-group">
-                            <label>Animal Photograph (Optional but Recommended)</label>
-                            <input 
-                                type="file" 
-                                className="form-control" 
-                                accept="image/png, image/jpeg, image/webp"
-                                onChange={handleImageChange}
-                            />
-                            {imagePreview && (
-                                <div style={{ marginTop: '1rem', textAlign: 'center' }}>
-                                    <img 
-                                        src={imagePreview} 
-                                        alt="Preview" 
-                                        style={{ maxHeight: '200px', borderRadius: '8px', border: '1px solid var(--glass-border)' }} 
+                            {/* Photo Upload */}
+                            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                                <label className="control-label" style={{ marginBottom: '0.5rem', display: 'block' }}>
+                                    Upload Photo of Injured Animal (Recommended)
+                                </label>
+                                <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    onChange={handleImageChange}
+                                    className="form-input-clean"
+                                    style={{ padding: '0.5rem' }}
+                                />
+                                {imagePreview && (
+                                    <div style={{ marginTop: '0.75rem' }}>
+                                        <img 
+                                            src={imagePreview} 
+                                            alt="Preview" 
+                                            style={{ maxWidth: '200px', maxHeight: '150px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #e2e8f0' }} 
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Map Location Picker */}
+                            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                    <label className="control-label">
+                                        Pin Incident Location <span style={{ color: '#ef4444' }}>*</span>
+                                    </label>
+                                    <button 
+                                        type="button" 
+                                        onClick={handleGetCurrentLocation} 
+                                        className="btn btn-forest-outline" 
+                                        style={{ padding: '0.35rem 0.85rem', fontSize: '0.85rem' }}
+                                    >
+                                        Use My GPS Location
+                                    </button>
+                                </div>
+                                <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.75rem' }}>
+                                    Click anywhere on the map below to drop the exact incident coordinates.
+                                </p>
+                                
+                                <div style={{ height: '320px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                                    <ReportMap 
+                                        center={mapCenter} 
+                                        zoom={14} 
+                                        onMapClick={(latlng) => setPosition(latlng)} 
+                                        selectedPosition={position}
                                     />
                                 </div>
-                            )}
-                        </div>
 
-                        <div className="form-group">
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                <label style={{ margin: 0 }}>Pin Incident Location</label>
-                                <button 
-                                    type="button" 
-                                    onClick={handleGetCurrentLocation} 
-                                    className="btn btn-secondary" 
-                                    style={{ padding: '0.35rem 0.85rem', fontSize: '0.85rem' }}
-                                >
-                                    📍 Use My GPS Location
-                                </button>
+                                {position && (
+                                    <p style={{ fontSize: '0.9rem', color: '#10b981', marginTop: '0.75rem', fontWeight: '600' }}>
+                                        Selected Coords: {position.lat.toFixed(5)}, {position.lng.toFixed(5)}
+                                    </p>
+                                )}
                             </div>
-                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-                                Click anywhere on the map to set the precise location pin.
-                            </p>
-                            
-                            <ReportMap 
-                                center={mapCenter} 
-                                zoom={14} 
-                                onMapClick={(latlng) => setPosition(latlng)} 
-                                selectedPosition={position}
-                            />
 
-                            {position && (
-                                <p style={{ fontSize: '0.9rem', color: 'var(--secondary)', marginTop: '0.75rem', fontWeight: '600' }}>
-                                    ✅ Selected Coords: {position.lat.toFixed(5)}, {position.lng.toFixed(5)}
-                                </p>
-                            )}
-                        </div>
-
-                        <button 
-                            type="submit" 
-                            className="btn btn-primary btn-block" 
-                            style={{ padding: '0.85rem', fontSize: '1rem', marginTop: '1.5rem' }}
-                            disabled={loading}
-                        >
-                            {loading ? 'Submitting Incident Report...' : '🚨 Broadcast Emergency Rescue Report'}
-                        </button>
-                    </form>
-                </div>
+                            <button 
+                                type="submit" 
+                                className="btn btn-forest-solid btn-block" 
+                                style={{ padding: '0.85rem', fontSize: '1rem', marginTop: '1.5rem' }}
+                                disabled={loading}
+                            >
+                                {loading ? 'Submitting Incident Report...' : 'Broadcast Emergency Rescue Report'}
+                            </button>
+                        </form>
+                    </div>
+                </main>
             </div>
-        </>
+
+            <AIChat />
+        </div>
     );
 };
 

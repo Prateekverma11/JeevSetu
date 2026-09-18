@@ -114,7 +114,7 @@ const renderLanding = ({ totalReports, totalRescuers, completedRescues, recentRe
             </nav>
 
             <header class="ssr-header">
-                <h1>🐾 ${escapeHtml(APP_NAME)}</h1>
+                <h1>${escapeHtml(APP_NAME)}</h1>
                 <p>Connecting citizens with rescuers to save animals in need</p>
                 <span class="ssr-badge">⚡ Server-Side Rendered</span>
             </header>

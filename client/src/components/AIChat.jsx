@@ -1,6 +1,5 @@
-import { useState, useContext, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import api from '../api/axios';
-import { AuthContext } from '../context/AuthContext';
 
 const AIChat = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -9,7 +8,6 @@ const AIChat = () => {
         { role: 'ai', text: 'Hi! I am RescueAI, your animal rescue assistant. Ask me anything about navigating the platform or rescue workflows!' }
     ]);
     const [loading, setLoading] = useState(false);
-    const { user } = useContext(AuthContext);
     const messagesEndRef = useRef(null);
 
     const quickPrompts = [
@@ -36,7 +34,7 @@ const AIChat = () => {
         try {
             const res = await api.post('/api/ai/chat', { message: textToSend });
             setChatHistory(prev => [...prev, { role: 'ai', text: res.data.message }]);
-        } catch (error) {
+        } catch {
             setChatHistory(prev => [...prev, { role: 'ai', text: 'Sorry, I am currently unable to reach the AI service.' }]);
         } finally {
             setLoading(false);
@@ -59,41 +57,30 @@ const AIChat = () => {
             </button>
 
             {isOpen && (
-                <div className="glass-panel animate-fade-in" style={{
-                    position: 'fixed',
-                    bottom: '6rem',
-                    right: '2rem',
-                    width: '360px',
-                    height: '520px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    zIndex: 1000,
-                    overflow: 'hidden',
-                    boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
-                }}>
-                    <div style={{ padding: '1rem', background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.15), rgba(139, 92, 246, 0.15))', borderBottom: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="ai-chat-window animate-fade-in">
+                    <div style={{ padding: '1rem', background: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <span style={{ fontSize: '1.25rem' }}>🤖</span>
                             <div>
                                 <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-main)' }}>RescueAI</h3>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>Smart Assistant</span>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: '600' }}>Smart Assistant</span>
                             </div>
                         </div>
-                        <button onClick={() => setIsOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
+                        <button onClick={() => setIsOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', fontSize: '1.5rem', lineHeight: '1' }}>&times;</button>
                     </div>
                     
-                    <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: '#ffffff' }}>
                         {chatHistory.map((msg, idx) => (
                             <div key={idx} style={{
                                 alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                                background: msg.role === 'user' ? 'var(--primary)' : 'rgba(255, 255, 255, 0.9)',
+                                background: msg.role === 'user' ? 'var(--primary)' : '#f1f5f9',
                                 color: msg.role === 'user' ? 'white' : 'var(--text-main)',
                                 padding: '0.75rem 1rem',
                                 borderRadius: msg.role === 'user' ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
                                 maxWidth: '85%',
                                 fontSize: '0.9rem',
                                 lineHeight: '1.5',
-                                border: msg.role === 'ai' ? '1px solid var(--glass-border)' : 'none',
+                                border: msg.role === 'ai' ? '1px solid #e2e8f0' : 'none',
                                 whiteSpace: 'pre-wrap'
                             }}>
                                 {msg.text}
@@ -109,14 +96,14 @@ const AIChat = () => {
 
                     {/* Quick Suggestions */}
                     {chatHistory.length <= 2 && !loading && (
-                        <div style={{ padding: '0.5rem 1rem', display: 'flex', flexWrap: 'wrap', gap: '0.35rem', borderTop: '1px solid var(--glass-border)' }}>
+                        <div style={{ padding: '0.5rem 1rem', display: 'flex', flexWrap: 'wrap', gap: '0.35rem', borderTop: '1px solid #e2e8f0', background: '#ffffff' }}>
                             {quickPrompts.map((prompt, idx) => (
                                 <button
                                     key={idx}
                                     onClick={() => sendUserMessage(prompt)}
                                     style={{
-                                        background: 'rgba(79, 70, 229, 0.05)',
-                                        border: '1px solid rgba(79, 70, 229, 0.2)',
+                                        background: '#f8fafc',
+                                        border: '1px solid #e2e8f0',
                                         color: 'var(--primary)',
                                         padding: '0.25rem 0.6rem',
                                         borderRadius: '12px',
@@ -131,14 +118,14 @@ const AIChat = () => {
                         </div>
                     )}
                     
-                    <form onSubmit={handleSend} style={{ padding: '0.75rem 1rem', borderTop: '1px solid var(--glass-border)', display: 'flex', gap: '0.5rem', background: 'rgba(243, 244, 246, 0.8)' }}>
+                    <form onSubmit={handleSend} style={{ padding: '0.75rem 1rem', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '0.5rem', background: '#ffffff' }}>
                         <input 
                             type="text" 
                             className="form-control" 
                             value={message}
                             onChange={(e) => setMessage(e.target.value)}
                             placeholder="Ask RescueAI..."
-                            style={{ flex: 1, fontSize: '0.9rem' }}
+                            style={{ flex: 1, fontSize: '0.9rem', background: '#ffffff' }}
                         />
                         <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem 1rem' }} disabled={loading || !message.trim()}>
                             Send

@@ -3,13 +3,13 @@ import { useContext } from 'react';
 import { AuthContext } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
-// Pages (We will create these next)
+// Pages
+import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import CitizenDashboard from './pages/CitizenDashboard';
 import RescuerDashboard from './pages/RescuerDashboard';
 import ReportForm from './pages/ReportForm';
-import JavaScriptConcepts from './pages/JavaScriptConcepts';
 
 import './index.css';
 
@@ -25,9 +25,9 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Navigate to={getDashboardPath()} replace />} />
-        <Route path="/login" element={!user ? <Login /> : <Navigate to={getDashboardPath()} />} />
-        <Route path="/register" element={!user ? <Register /> : <Navigate to={getDashboardPath()} />} />
+        <Route path="/" element={<Landing />} />
+        <Route path="/login" element={!user ? <Login /> : <Navigate to={getDashboardPath()} replace />} />
+        <Route path="/register" element={!user ? <Register /> : <Navigate to={getDashboardPath()} replace />} />
         
         <Route path="/dashboard" element={
           <ProtectedRoute allowedRoles={['CITIZEN']}>
@@ -47,10 +47,8 @@ function App() {
           </ProtectedRoute>
         } />
         
-        <Route path="/concepts" element={<JavaScriptConcepts />} />
-        
         {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Router>
   );

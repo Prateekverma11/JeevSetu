@@ -197,6 +197,24 @@ const handleRescueAction = async (req, res, next, action) => {
     }
 };
 
+// @desc    Get completed rescue history for rescuer
+// @route   GET /api/rescuers/history
+// @access  Private (Rescuer)
+const getRescueHistory = async (req, res, next) => {
+    try {
+        const history = await RescueReport.find({
+            assignedRescuerId: req.user._id,
+            status: 'COMPLETED'
+        })
+        .populate('citizenId', 'name email phone')
+        .sort('-completedAt');
+
+        res.json(history);
+    } catch (error) {
+        next(error);
+    }
+};
+
 const acceptRescue = (req, res, next) => handleRescueAction(req, res, next, 'ACCEPT');
 const declineRescue = (req, res, next) => handleRescueAction(req, res, next, 'DECLINE');
 const startRescue = (req, res, next) => handleRescueAction(req, res, next, 'START');
@@ -207,6 +225,7 @@ module.exports = {
     updateRadius,
     updateAvailability,
     getNearbyRequests,
+    getRescueHistory,
     acceptRescue,
     declineRescue,
     startRescue,
