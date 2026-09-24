@@ -88,20 +88,44 @@ const chatWithAI = async (req, res, next) => {
         }
 
         const groq = new Groq({ apiKey: process.env.LLM_API_KEY });
+        const candidateModels = [
+            process.env.LLM_MODEL,
+            'openai/gpt-oss-20b',
+            'qwen/qwen3.8-27b',
+            'openai/gpt-oss-120b',
+            'allam-2-7b'
+        ].filter(Boolean);
 
-        const response = await groq.chat.completions.create({
-            model: 'llama-3.1-8b-instant',
-            messages: [
-                {
-                    role: 'system',
-                    content: systemPrompt
-                },
-                {
-                    role: 'user',
-                    content: message
+        let response = null;
+        let lastError = null;
+
+        for (const model of candidateModels) {
+            try {
+                response = await groq.chat.completions.create({
+                    model,
+                    messages: [
+                        {
+                            role: 'system',
+                            content: systemPrompt
+                        },
+                        {
+                            role: 'user',
+                            content: message
+                        }
+                    ]
+                });
+                if (response && response.choices && response.choices.length > 0) {
+                    break;
                 }
-            ]
-        });
+            } catch (err) {
+                lastError = err;
+                console.warn(`[AI] Model ${model} failed, trying next fallback:`, err.message);
+            }
+        }
+
+        if (!response || !response.choices || response.choices.length === 0) {
+            throw lastError || new Error('No valid response received from AI model');
+        }
 
         res.json({
             success: true,
@@ -109,7 +133,7 @@ const chatWithAI = async (req, res, next) => {
         });
 
     } catch (error) {
-        console.error('AI Error:', error);
+        console.error('AI Error:', error.message || error);
         res.status(500).json({
             success: false,
             message: 'Failed to communicate with AI assistant.'

@@ -6,6 +6,7 @@ import Sidebar from '../components/Sidebar';
 import TopHeader from '../components/TopHeader';
 import ReportMap from '../components/ReportMap';
 import AIChat from '../components/AIChat';
+import ImageModal from '../components/ImageModal';
 
 const ReportForm = () => {
     useContext(AuthContext);
@@ -18,6 +19,7 @@ const ReportForm = () => {
     });
     const [image, setImage] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
+    const [selectedImage, setSelectedImage] = useState(null);
     const [position, setPosition] = useState(null); // {lat, lng}
     const [mapCenter, setMapCenter] = useState([20.5937, 78.9629]);
     const [error, setError] = useState('');
@@ -190,8 +192,16 @@ const ReportForm = () => {
                                         <img 
                                             src={imagePreview} 
                                             alt="Preview" 
+                                            className="rescuer-clickable-img"
                                             style={{ maxWidth: '200px', maxHeight: '150px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #e2e8f0' }} 
+                                            onClick={() => setSelectedImage({
+                                                src: imagePreview,
+                                                title: `${formData.animalType} (Uploaded Photo Preview)`,
+                                                subtitle: `Severity: ${formData.severity}`
+                                            })}
+                                            title="Click to view full size"
                                         />
+                                        <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 0 0' }}>🔍 Click image to enlarge</p>
                                     </div>
                                 )}
                             </div>
@@ -245,6 +255,13 @@ const ReportForm = () => {
             </div>
 
             <AIChat />
+
+            <ImageModal 
+                isOpen={!!selectedImage} 
+                onClose={() => setSelectedImage(null)} 
+                src={typeof selectedImage === 'string' ? selectedImage : selectedImage?.src} 
+                alt="Upload Preview Full View" 
+            />
         </div>
     );
 };

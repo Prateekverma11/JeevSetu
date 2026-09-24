@@ -5,6 +5,7 @@ import { SocketContext } from '../context/SocketContext';
 import Sidebar from '../components/Sidebar';
 import TopHeader from '../components/TopHeader';
 import AIChat from '../components/AIChat';
+import ImageModal from '../components/ImageModal';
 import { Link } from 'react-router-dom';
 
 const CitizenDashboard = () => {
@@ -13,6 +14,7 @@ const CitizenDashboard = () => {
     const [reports, setReports] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedImage, setSelectedImage] = useState(null);
 
     useEffect(() => {
         fetchReports();
@@ -67,10 +69,19 @@ const CitizenDashboard = () => {
                 {steps.map((step, idx) => {
                     const isPassed = idx <= currentIndex || (currentStatus === 'NOTIFIED' && idx === 0);
                     const isCurrent = step === currentStatus || (currentStatus === 'NOTIFIED' && idx === 0);
+                    const isStepFinished = isPassed && (step === 'COMPLETED' || idx < currentIndex);
 
                     return (
                         <div key={step} className={`timeline-step ${isPassed ? 'completed' : ''} ${isCurrent ? 'active' : ''}`}>
-                            <div className="step-circle">{idx + 1}</div>
+                            <div className="step-circle">
+                                {isStepFinished ? (
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                ) : (
+                                    idx + 1
+                                )}
+                            </div>
                             <span className="step-label">{step.replace('_', ' ')}</span>
                         </div>
                     );
@@ -141,7 +152,18 @@ const CitizenDashboard = () => {
                             {filteredReports.map((report) => (
                                 <div key={report._id} className="forest-card citizen-report-card">
                                     {report.imageUrl ? (
-                                        <img src={getImageUrl(report.imageUrl)} alt={report.animalType} className="citizen-report-img" />
+                                        <div 
+                                            className="citizen-report-img-wrapper" 
+                                            onClick={() => setSelectedImage({
+                                                src: getImageUrl(report.imageUrl),
+                                                title: `${report.animalType} Report`,
+                                                subtitle: `Status: ${report.status.replace('_', ' ')} • Severity: ${report.severity}`
+                                            })}
+                                            title="Click to view full size"
+                                        >
+                                            <img src={getImageUrl(report.imageUrl)} alt={report.animalType} className="citizen-report-img" />
+                                            <div className="citizen-report-img-hint">🔍 View Full Image</div>
+                                        </div>
                                     ) : (
                                         <div className="citizen-no-img">No Image Provided</div>
                                     )}
@@ -172,6 +194,13 @@ const CitizenDashboard = () => {
             </div>
             
             <AIChat />
+
+            <ImageModal 
+                isOpen={!!selectedImage} 
+                onClose={() => setSelectedImage(null)} 
+                src={typeof selectedImage === 'string' ? selectedImage : selectedImage?.src} 
+                alt="Report Animal Full View" 
+            />
         </div>
     );
 };
