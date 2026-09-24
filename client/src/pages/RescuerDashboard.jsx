@@ -6,12 +6,14 @@ import Sidebar from '../components/Sidebar';
 import TopHeader from '../components/TopHeader';
 import AIChat from '../components/AIChat';
 import ReportMap from '../components/ReportMap';
+import ImageModal from '../components/ImageModal';
 
 const RescuerDashboard = () => {
     const { user, login } = useContext(AuthContext);
     const { socket } = useContext(SocketContext);
     const [nearbyReports, setNearbyReports] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [selectedImage, setSelectedImage] = useState(null);
 
     const isValidCoord = (lat, lng) => {
         const nLat = Number(lat);
@@ -374,7 +376,14 @@ const RescuerDashboard = () => {
                                             <img 
                                                 src={report.imageUrl ? getImageUrl(report.imageUrl) : 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=150&auto=format&fit=crop&q=80'} 
                                                 alt={report.animalType}
+                                                className="rescuer-clickable-img"
                                                 style={{ width: '110px', height: '110px', borderRadius: '10px', objectFit: 'cover' }}
+                                                onClick={() => setSelectedImage({
+                                                    src: report.imageUrl ? getImageUrl(report.imageUrl) : 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=800&auto=format&fit=crop&q=80',
+                                                    title: `${report.animalType} (Completed Rescue)`,
+                                                    subtitle: `Severity: ${report.severity}`
+                                                })}
+                                                title="Click to view full image"
                                             />
                                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -547,7 +556,13 @@ const RescuerDashboard = () => {
                                                     <img 
                                                         src={report.imageUrl ? getImageUrl(report.imageUrl) : 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=150&auto=format&fit=crop&q=80'} 
                                                         alt={report.animalType}
-                                                        className="request-thumbnail"
+                                                        className="request-thumbnail rescuer-clickable-img"
+                                                        onClick={() => setSelectedImage({
+                                                            src: report.imageUrl ? getImageUrl(report.imageUrl) : 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=800&auto=format&fit=crop&q=80',
+                                                            title: `${report.animalType} (In Progress)`,
+                                                            subtitle: `Severity: ${report.severity}`
+                                                        })}
+                                                        title="Click to view full image"
                                                     />
                                                     <div className="request-meta-body">
                                                         <div className="request-top-row">
@@ -598,7 +613,13 @@ const RescuerDashboard = () => {
                                                     <img 
                                                         src={report.imageUrl ? getImageUrl(report.imageUrl) : 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=150&auto=format&fit=crop&q=80'} 
                                                         alt={report.animalType}
-                                                        className="request-thumbnail"
+                                                        className="request-thumbnail rescuer-clickable-img"
+                                                        onClick={() => setSelectedImage({
+                                                            src: report.imageUrl ? getImageUrl(report.imageUrl) : 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=800&auto=format&fit=crop&q=80',
+                                                            title: `${report.animalType} (Pending Request)`,
+                                                            subtitle: `Severity: ${report.severity}`
+                                                        })}
+                                                        title="Click to view full image"
                                                     />
                                                     <div className="request-meta-body">
                                                         <div className="request-top-row">
@@ -655,6 +676,13 @@ const RescuerDashboard = () => {
             </div>
 
             <AIChat />
+
+            <ImageModal 
+                isOpen={!!selectedImage} 
+                onClose={() => setSelectedImage(null)} 
+                src={typeof selectedImage === 'string' ? selectedImage : selectedImage?.src} 
+                alt="Rescue Animal Full View" 
+            />
         </div>
     );
 };

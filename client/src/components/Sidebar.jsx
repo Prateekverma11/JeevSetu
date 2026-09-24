@@ -109,14 +109,6 @@ const Sidebar = ({ activeTab, onTabChange }) => {
                         >
                             <span className="nav-label">Report Animal</span>
                         </button>
-
-                        <button
-                            type="button"
-                            className={`sidebar-nav-item ${location.pathname === '/' ? 'active' : ''}`}
-                            onClick={() => handleDirectNav('/')}
-                        >
-                            <span className="nav-label">Public Portal</span>
-                        </button>
                     </>
                 )}
             </nav>
