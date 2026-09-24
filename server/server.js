@@ -19,7 +19,7 @@ const server = http.createServer(app);
 // Setup Socket.IO
 const io = new Server(server, {
     cors: {
-        origin: process.env.CLIENT_URL || 'http://localhost:5173',
+        origin: (origin, callback) => callback(null, true),
         methods: ['GET', 'POST', 'PATCH', 'DELETE'],
         credentials: true
     }
