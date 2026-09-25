@@ -519,8 +519,8 @@ const RescuerDashboard = () => {
                             </div>
 
                             {/* ── COLUMN 2: Extended Center Interactive Map Card ── */}
-                            <div className="forest-card map-view-card" style={{ minHeight: '580px' }}>
-                                <div className="map-inner-wrapper" style={{ minHeight: '560px' }}>
+                            <div className="forest-card map-view-card" style={{ height: '620px', maxHeight: '620px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                <div className="map-inner-wrapper" style={{ height: '100%', maxHeight: '100%', flex: 1, minHeight: 0, overflow: 'hidden' }}>
                                     <ReportMap
                                         center={activeMapCenter}
                                         reports={nearbyReports}

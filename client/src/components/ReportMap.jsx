@@ -419,7 +419,7 @@ const ReportMap = ({
     }
 
     return (
-        <div className="map-container" style={{ position: 'relative', width: '100%', height: '100%', minHeight: '380px' }}>
+        <div className="map-container" style={{ position: 'relative', width: '100%', height: '100%', minHeight: '350px', maxHeight: '100%', overflow: 'hidden', borderRadius: '12px' }}>
             {!isLoaded && (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', zIndex: 10, borderRadius: '12px', color: '#64748b', fontWeight: 500 }}>
                     <span>Loading Mappls Map...</span>
@@ -428,7 +428,7 @@ const ReportMap = ({
             <div 
                 ref={mapContainerRef} 
                 id={uniqueMapId}
-                style={{ width: '100%', height: '100%', minHeight: '380px', borderRadius: '12px' }} 
+                style={{ width: '100%', height: '100%', minHeight: '350px', maxHeight: '100%', borderRadius: '12px', overflow: 'hidden' }} 
             />
         </div>
     );
