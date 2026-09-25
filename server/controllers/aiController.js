@@ -70,6 +70,23 @@ Response style:
 - Give numbered steps when navigation is required.
 - Mention the relevant dashboard/page.
 - Never claim to have performed an action unless the backend confirms it.`;
+// Helper to retrieve all configured API keys in priority order
+const getApiKeys = () => {
+    const rawKeys = [
+        process.env.LLM_API_KEY,
+        process.env.LLM_API_KEY_BACKUP,
+        process.env.LLM_API_KEYS
+    ].filter(Boolean);
+
+    const keys = [];
+    rawKeys.forEach(item => {
+        item.split(',').map(k => k.trim()).filter(Boolean).forEach(k => {
+            if (!keys.includes(k)) keys.push(k);
+        });
+    });
+
+    return keys;
+};
 
 const chatWithAI = async (req, res, next) => {
     try {
@@ -80,51 +97,77 @@ const chatWithAI = async (req, res, next) => {
             throw new Error('Message is required');
         }
 
-        if (!process.env.LLM_API_KEY) {
+        const apiKeys = getApiKeys();
+
+        if (apiKeys.length === 0) {
             return res.json({
                 success: true,
                 message: "LLM_API_KEY is not configured. The AI assistant is currently unavailable."
             });
         }
 
-        const groq = new Groq({ apiKey: process.env.LLM_API_KEY });
         const candidateModels = [
             process.env.LLM_MODEL,
+            'llama-3.3-70b-versatile',
+            'llama-3.1-8b-instant',
+            'mixtral-8x7b-32768',
+            'gemma2-9b-it',
             'openai/gpt-oss-20b',
-            'qwen/qwen3.8-27b',
-            'openai/gpt-oss-120b',
-            'allam-2-7b'
+            'qwen/qwen3.8-27b'
         ].filter(Boolean);
 
         let response = null;
         let lastError = null;
 
-        for (const model of candidateModels) {
-            try {
-                response = await groq.chat.completions.create({
-                    model,
-                    messages: [
-                        {
-                            role: 'system',
-                            content: systemPrompt
-                        },
-                        {
-                            role: 'user',
-                            content: message
-                        }
-                    ]
-                });
-                if (response && response.choices && response.choices.length > 0) {
-                    break;
+        // Iterate through all available API keys if quota/rate-limit is reached
+        for (let keyIdx = 0; keyIdx < apiKeys.length; keyIdx++) {
+            const currentApiKey = apiKeys[keyIdx];
+            const groq = new Groq({ apiKey: currentApiKey });
+            let keyExhausted = false;
+
+            for (const model of candidateModels) {
+                try {
+                    response = await groq.chat.completions.create({
+                        model,
+                        messages: [
+                            {
+                                role: 'system',
+                                content: systemPrompt
+                            },
+                            {
+                                role: 'user',
+                                content: message
+                            }
+                        ]
+                    });
+
+                    if (response && response.choices && response.choices.length > 0) {
+                        break; // Success! Break model loop
+                    }
+                } catch (err) {
+                    lastError = err;
+                    const isRateLimitOrQuota = err.status === 429 || (err.message && err.message.toLowerCase().includes('rate limit')) || (err.message && err.message.toLowerCase().includes('quota'));
+                    const isAuthError = err.status === 401;
+
+                    console.warn(`[AI] API Key #${keyIdx + 1} with Model ${model} failed (${err.message}).`);
+
+                    // If quota exceeded or auth error for this key, failover directly to next key
+                    if (isRateLimitOrQuota || isAuthError) {
+                        console.warn(`[AI] Quota/Auth issue detected on Key #${keyIdx + 1}. Switching to backup API key...`);
+                        keyExhausted = true;
+                        break;
+                    }
                 }
-            } catch (err) {
-                lastError = err;
-                console.warn(`[AI] Model ${model} failed, trying next fallback:`, err.message);
+            }
+
+            // If we got a valid response, exit the key loop
+            if (response && response.choices && response.choices.length > 0) {
+                break;
             }
         }
 
         if (!response || !response.choices || response.choices.length === 0) {
-            throw lastError || new Error('No valid response received from AI model');
+            throw lastError || new Error('All configured AI API keys and models exhausted or unavailable.');
         }
 
         res.json({
